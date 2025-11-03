@@ -1,0 +1,30 @@
+{
+  "name": "shadcn-extensions",
+  "version": "0.0.1",
+  "description": "Some useful shadcn/ui extensions",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YThinker/shadcn-extensions.git"
+  },
+  "keywords": [
+    "shadcn/ui"
+  ],
+  "author": "YThinker",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/YThinker/shadcn-extensions/issues"
+  },
+  "homepage": "https://github.com/YThinker/shadcn-extensions#readme",
+  "devDependencies": {
+    "react": "17",
+    "react-dom": "17"
+  },
+  "peerDependencies": {
+    "react": "17",
+    "react-dom": "17"
+  }
+}
