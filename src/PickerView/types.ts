@@ -18,9 +18,7 @@ export interface PickerItemProps<
   M extends PickerModeType
 > {
   mode?: M;
-  options?: M extends 'cascade'
-    ? CascadeOptionItem<V>[]
-    : NormalOptionItem<V>[];
+  options?: NormalOptionItem<V>[];
   value?: V;
   onValueChange?: (
     val: V,
@@ -28,7 +26,6 @@ export interface PickerItemProps<
       ? CascadeOptionItem<V>
       : NormalOptionItem<V>
   ) => void;
-  perspective?: 'left' | 'right';
   label?: ReactNode;
   loop?: boolean;
 }
