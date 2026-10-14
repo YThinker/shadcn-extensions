@@ -1,6 +1,13 @@
 import { Slot } from 'radix-ui';
 import type { SetStateAction } from 'react';
-import { createContext, useCallback, useContext, useMemo, useRef } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 import Toast from '../Toast';
 import { Plus, RotateCcw, X, File } from 'lucide-react';
 import { cn } from '@/shadcn/lib/utils';
@@ -24,11 +31,10 @@ interface FileUploaderItem {
   extra?: Record<string, any>; // 用户自定义数据
 }
 
-interface FileUploaderProps
-  extends Omit<
-    React.HTMLAttributes<HTMLDivElement>,
-    'value' | 'defaultValue' | 'onChange'
-  > {
+interface FileUploaderProps extends Omit<
+  React.HTMLAttributes<HTMLDivElement>,
+  'value' | 'defaultValue' | 'onChange'
+> {
   value?: FileUploaderItem[];
   defaultValue?: FileUploaderItem[];
   onValueChange?: (value?: FileUploaderItem[]) => void;
@@ -61,8 +67,10 @@ interface TriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   asChild?: boolean;
 }
 
-interface ListProps
-  extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
+interface ListProps extends Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  'children'
+> {
   style?: React.CSSProperties;
   deletable?: boolean;
   deletableWhenDisabled?: boolean;
@@ -454,6 +462,8 @@ const List = ({
   const { value, onValueChange, disabled, requestUploadFetch } =
     useContext(FileUploaderContext);
 
+  const [showMediaPreview, setShowMediaPreview] = useState<Slide>();
+
   const showDelete =
     deletable && (disabled ? deletableWhenDisabled === true : true);
 
@@ -503,10 +513,7 @@ const List = ({
     if (previewResult === false) return;
     const slide = previewSlidesMap?.[index];
     if (!slide) return;
-    MediaViewer.show({
-      mergePlugins: [VideoPlugin],
-      slides: [slide]
-    });
+    setShowMediaPreview(slide);
   };
 
   if (!value) return null;
@@ -562,6 +569,12 @@ const List = ({
           </button>
         )
       )}
+      <MediaViewer
+        open={!!showMediaPreview}
+        mergePlugins={[VideoPlugin]}
+        slides={showMediaPreview ? [showMediaPreview] : []}
+        onOpenChange={() => setShowMediaPreview(void 0)}
+      />
     </>
   );
 };
