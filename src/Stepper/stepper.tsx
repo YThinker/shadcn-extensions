@@ -13,30 +13,91 @@ import type {
   StepperMarkerProps,
   StepperContentProps,
   StepperMarkerVariant,
-  StepperMarkerSize,
+  StepperItemSize,
   StepperOrientation,
   StepperProps
 } from './stepper.types';
 import { cn } from '@/shadcn/lib/utils';
-
-// ==================== Constants ====================
-
-const STATUS_COLOR_MAP: Record<StepperStatus, string> = {
-  current: 'bg-info-green-foreground border-info-green-foreground',
-  completed: 'bg-info-green-foreground border-info-green-foreground',
-  error: 'bg-info-red-foreground border-info-red-foreground',
-  upcoming: 'bg-main-3 border-main-3',
-  default: 'bg-main-3 border-main-3'
-};
+import { useControllableValue } from 'ahooks';
+import { Children, cloneElement, isValidElement } from 'react';
 
 // ==================== Helpers ====================
 
-function getStatusColor(status: StepperStatus): string {
-  return STATUS_COLOR_MAP[status];
-}
+const itemVariants = cva('relative', {
+  variants: {
+    orientation: {
+      vertical: 'flex flex-row items-stretch',
+      horizontal: 'flex flex-1 flex-col'
+    }
+  },
+  defaultVariants: {
+    orientation: 'vertical'
+  }
+});
+
+const verticalTrackVariants = cva('relative', {
+  variants: {
+    size: {
+      default: 'w-3',
+      sm: 'w-2',
+      lg: 'w-4',
+      icon: 'w-8'
+    },
+    orientation: {
+      vertical: 'flex flex-col items-center'
+    }
+  },
+  defaultVariants: {
+    size: 'default',
+    orientation: 'vertical'
+  }
+});
+
+const horizontalTrackVariants = cva('relative', {
+  variants: {
+    size: {
+      default: 'h-3',
+      sm: 'h-2',
+      lg: 'h-4',
+      icon: 'h-8'
+    },
+    orientation: {
+      horizontal: 'flex w-full flex-row items-center justify-center'
+    }
+  },
+  defaultVariants: {
+    size: 'default',
+    orientation: 'horizontal'
+  }
+});
+
+const connectorVariants = cva('flex-1 overflow-hidden border', {
+  variants: {
+    variant: {
+      solid: 'border-solid',
+      dashed: 'border-dashed'
+    },
+    orientation: {
+      vertical: 'w-0',
+      horizontal: 'absolute left-1/2 top-1/2 h-0 w-full -translate-y-1/2'
+    },
+    status: {
+      current: 'border-divide',
+      completed: 'border-info-green-foreground',
+      error: 'border-info-red-foreground',
+      upcoming: 'border-divide',
+      default: 'border-main-3'
+    }
+  },
+  defaultVariants: {
+    variant: 'solid',
+    orientation: 'vertical',
+    status: 'default'
+  }
+});
 
 const markerVariants = cva(
-  'relative z-10 flex items-center justify-center rounded-full border',
+  'relative z-[1] flex items-center justify-center rounded-full border',
   {
     variants: {
       size: {
@@ -49,11 +110,19 @@ const markerVariants = cva(
         default: '',
         outline: 'bg-white',
         ghost: 'border-transparent'
+      },
+      status: {
+        current: 'bg-info-blue-foreground border-info-blue-foreground',
+        completed: 'bg-info-green-foreground border-info-green-foreground',
+        error: 'bg-info-red-foreground border-info-red-foreground',
+        upcoming: 'bg-divide border-divide',
+        default: 'bg-main-3 border-main-3'
       }
     },
     defaultVariants: {
       size: 'default',
-      variant: 'default'
+      variant: 'default',
+      status: 'default'
     }
   }
 );
@@ -61,7 +130,9 @@ const markerVariants = cva(
 // ==================== Context ====================
 
 const StepperContext = React.createContext<StepperContextValue>({
-  orientation: 'vertical'
+  orientation: 'vertical',
+  value: void 0,
+  onValueChange: () => void 0
 });
 
 function useStepperContext() {
@@ -69,7 +140,8 @@ function useStepperContext() {
 }
 
 const StepperItemContext = React.createContext<StepperItemContextValue>({
-  status: 'default'
+  status: 'default',
+  size: 'default'
 });
 
 function useStepperItemContext() {
@@ -79,21 +151,59 @@ function useStepperItemContext() {
 // ==================== Stepper Root ====================
 
 const Root = React.forwardRef<HTMLDivElement, StepperProps>(
-  ({ orientation = 'vertical', className, asChild, ...rest }, ref) => {
+  (
+    {
+      orientation = 'vertical',
+      value: valueProp,
+      defaultValue: defaultValueProp,
+      onValueChange: onValueChangeProp,
+      className,
+      asChild,
+      children: childrenProp,
+      ...rest
+    },
+    ref
+  ) => {
     const Component = asChild ? Slot.Slot : 'div';
 
+    const [value, onValueChange] = useControllableValue({
+      value: valueProp,
+      defaultValue: defaultValueProp,
+      onChange: onValueChangeProp
+    });
+
+    let max = 0;
+    const children = Children.map(childrenProp, (child) => {
+      if (!isValidElement(child)) return child;
+      if (child.type === Item) {
+        const clonedEle = cloneElement(
+          child as React.ReactElement<StepperItemProps>,
+          {
+            _index: max
+          }
+        );
+        // eslint-disable-next-line react-hooks/immutability
+        max += 1;
+        return clonedEle;
+      }
+      return child;
+    });
+
     return (
-      <StepperContext.Provider value={{ orientation }}>
+      <StepperContext.Provider value={{ orientation, value, onValueChange }}>
         <Component
           ref={ref}
           className={cn(
+            'text-sm',
             orientation === 'vertical'
               ? 'flex flex-col'
               : 'flex w-full flex-row',
             className
           )}
           {...rest}
-        />
+        >
+          {children}
+        </Component>
       </StepperContext.Provider>
     );
   }
@@ -104,21 +214,28 @@ Root.displayName = 'StepperRoot';
 // ==================== Stepper Item ====================
 
 const Item = React.forwardRef<HTMLDivElement, StepperItemProps>(
-  ({ status = 'default', className, asChild, ...rest }, ref) => {
-    const { orientation } = useStepperContext();
+  ({ status, size = 'default', _index, className, asChild, ...rest }, ref) => {
+    const { orientation, value } = useStepperContext();
     const Component = asChild ? Slot.Slot : 'div';
 
+    const mergedStatus: StepperStatus =
+      typeof status === 'string'
+        ? status
+        : !(typeof value === 'number' && typeof _index === 'number')
+          ? 'default'
+          : value === _index
+            ? 'current'
+            : value > _index
+              ? 'completed'
+              : 'upcoming';
+
     return (
-      <StepperItemContext.Provider value={{ status }}>
+      <StepperItemContext.Provider
+        value={{ status: mergedStatus, size, _index }}
+      >
         <Component
           ref={ref}
-          className={cn(
-            'relative',
-            orientation === 'vertical'
-              ? 'flex flex-row items-stretch'
-              : 'flex flex-1 flex-col',
-            className
-          )}
+          className={cn('relative', itemVariants({ orientation }), className)}
           {...rest}
         />
       </StepperItemContext.Provider>
@@ -133,6 +250,7 @@ Item.displayName = 'StepperItem';
 const Track = React.forwardRef<HTMLDivElement, StepperTrackProps>(
   ({ className, asChild, ...rest }, ref) => {
     const { orientation } = useStepperContext();
+    const { size } = useStepperItemContext();
     const Component = asChild ? Slot.Slot : 'div';
 
     return (
@@ -140,9 +258,9 @@ const Track = React.forwardRef<HTMLDivElement, StepperTrackProps>(
         ref={ref}
         className={cn(
           'relative',
-          orientation === 'vertical'
-            ? 'flex flex-col items-center'
-            : 'flex w-full flex-row items-center justify-center',
+          orientation === 'horizontal'
+            ? horizontalTrackVariants({ orientation, size })
+            : verticalTrackVariants({ orientation, size }),
           className
         )}
         {...rest}
@@ -158,19 +276,20 @@ Track.displayName = 'StepperTrack';
 const Connector = React.forwardRef<HTMLDivElement, StepperConnectorProps>(
   ({ variant = 'solid', className, asChild, ...rest }, ref) => {
     const { orientation } = useStepperContext();
-
-    const baseClassName = cn(
-      'flex-1 overflow-hidden border border-divide',
-      variant === 'dashed' ? 'border-dashed' : 'border-solid',
-      orientation === 'vertical'
-        ? 'w-0'
-        : 'absolute left-1/2 top-1/2 h-0 w-full -translate-y-1/2',
-      className
-    );
+    const { status } = useStepperItemContext();
 
     const Component = asChild ? Slot.Slot : 'div';
 
-    return <Component ref={ref} className={baseClassName} {...rest} />;
+    return (
+      <Component
+        ref={ref}
+        className={cn(
+          connectorVariants({ variant, orientation, status }),
+          className
+        )}
+        {...rest}
+      />
+    );
   }
 );
 
@@ -179,19 +298,20 @@ Connector.displayName = 'StepperConnector';
 // ==================== Stepper Marker ====================
 
 const Marker = React.forwardRef<HTMLDivElement, StepperMarkerProps>(
-  (
-    { variant = 'default', size = 'default', className, asChild, ...rest },
-    ref
-  ) => {
-    const { status } = useStepperItemContext();
-    const color = getStatusColor(status);
+  ({ variant = 'default', className, asChild, onClick, ...rest }, ref) => {
+    const { onValueChange } = useStepperContext();
+    const { status, size, _index } = useStepperItemContext();
 
     const Component = asChild ? Slot.Slot : 'div';
 
     return (
       <Component
         ref={ref}
-        className={cn(color, markerVariants({ size, variant }), className)}
+        className={cn(markerVariants({ size, variant, status }), className)}
+        onClick={(e) => {
+          onValueChange?.(_index);
+          onClick?.(e);
+        }}
         {...rest}
       />
     );
@@ -205,6 +325,7 @@ Marker.displayName = 'StepperMarker';
 const Content = React.forwardRef<HTMLDivElement, StepperContentProps>(
   ({ className, asChild, ...rest }, ref) => {
     const { orientation } = useStepperContext();
+    const { status } = useStepperItemContext();
     const Component = asChild ? Slot.Slot : 'div';
 
     return (
@@ -214,6 +335,7 @@ const Content = React.forwardRef<HTMLDivElement, StepperContentProps>(
           orientation === 'vertical'
             ? 'flex-1'
             : 'flex w-full flex-col items-center',
+          status === 'upcoming' && 'text-placeholder',
           className
         )}
         {...rest}
@@ -245,6 +367,6 @@ export type {
   StepperContentProps,
   StepperStatus,
   StepperMarkerVariant,
-  StepperMarkerSize,
+  StepperItemSize,
   StepperOrientation
 };
